@@ -1,26 +1,29 @@
-import express from "express";
-import mongoose from "mongoose";
 import dotenv from "dotenv";
-
-console.log("SERVER FILE LOADED");
-
 dotenv.config();
+
+import express from "express";
+import { connectDB } from "./config/db";
+import filesRouter from "./modules/files/files.routes";
+import authRouter from "./modules/auth/auth.routes";
 
 const app = express();
 app.use(express.json());
 
-// Простейший роут
+app.use("/files", filesRouter);
+app.use("/auth", authRouter);
+
 app.get("/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
-// Подключение к MongoDB
-const mongoUri = process.env.MONGO_URI || "mongodb://localhost:27017/allstorage";
-mongoose.connect(mongoUri)
-  .then(() => console.log("MongoDB connected"))
-  .catch(err => console.error(err));
+const PORT = Number(process.env.PORT) || 3000;
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+const startServer = async () => {
+  await connectDB();
+
+  app.listen(PORT, () => {
+    console.log(`🚀 Server running on http://localhost:${PORT}`);
+  });
+};
+
+startServer();
