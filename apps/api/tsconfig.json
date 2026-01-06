@@ -1,5 +1,9 @@
 {
   "compilerOptions": {
+    "baseUrl": "./",
+    "paths": {
+      "*": ["node_modules/*", "../../packages/*/src"]
+    },
     "rootDir": "src",
     "outDir": "dist",
     "module": "commonjs",
