@@ -19,6 +19,8 @@ export interface IFile {
 
   encrypted: boolean;
   file_key_encrypted?: string;
+  iv?: string;
+  data?: string;
 
   created_at: Date;
   updated_at: Date;
@@ -75,6 +77,12 @@ const FileSchema = new Schema<IFile>(
     },
 
     file_key_encrypted: {
+      type: String,
+    },
+    iv: {
+      type: String,
+    },
+    data: {
       type: String,
     },
   },

@@ -2,6 +2,9 @@ import { Request, Response } from "express";
 import { Types } from "mongoose";
 import { FileModel } from "./files.model";
 import { AuthRequest } from "../../middlewares/auth.middleware";
+import { encryptAES, encryptRSA } from "pkg-crypto";
+import { UserModel } from "../users/users.model";
+import forge from "node-forge";
 
 export const createFolder = async (req: AuthRequest, res: Response) => {
   try {
@@ -116,6 +119,99 @@ export const getFile = async (req: AuthRequest, res: Response) => {
     }
 
     res.json(file);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+export const encryptFile = async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const owner_id = req.user!.id as string;
+    const idParam = req.params.id as string;
+    const { data_base64 } = req.body;
+
+    if (!Types.ObjectId.isValid(owner_id) || !Types.ObjectId.isValid(idParam)) {
+      return res.status(400).json({ error: "Invalid id" });
+    }
+    if (!data_base64) {
+      return res.status(400).json({ error: "data_base64 is required" });
+    }
+
+    const user = await UserModel.findById(owner_id);
+    if (!user || !user.public_key || !user.encrypted_private_key) {
+      return res.status(400).json({ error: "User keys are missing" });
+    }
+    try {
+      forge.pki.publicKeyFromPem(user.public_key);
+    } catch {
+      return res.status(400).json({ error: "Invalid user public_key PEM" });
+    }
+
+    const file = await FileModel.findOne({
+      _id: new Types.ObjectId(idParam),
+      owner_id: new Types.ObjectId(owner_id),
+      type: "file",
+    });
+    if (!file) {
+      return res.status(404).json({ error: "Not found" });
+    }
+    if (file.encrypted) {
+      return res.status(409).json({ error: "Already encrypted" });
+    }
+
+    const plaintext = Buffer.from(data_base64, "base64");
+    const { encrypted, key, iv } = encryptAES(plaintext);
+    const file_key_encrypted = encryptRSA(user.public_key, Buffer.from(key, "base64"));
+
+    file.encrypted = true;
+    file.iv = iv;
+    file.data = encrypted;
+    file.file_key_encrypted = file_key_encrypted;
+
+    await file.save();
+    res.json({ id: file._id, encrypted: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+export const getEncryptedContents = async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const owner_id = req.user!.id as string;
+    const idParam = req.params.id as string;
+
+    if (!Types.ObjectId.isValid(owner_id) || !Types.ObjectId.isValid(idParam)) {
+      return res.status(400).json({ error: "Invalid id" });
+    }
+
+    const file = await FileModel.findOne({
+      _id: new Types.ObjectId(idParam),
+      owner_id: new Types.ObjectId(owner_id),
+      type: "file",
+    });
+    if (!file) {
+      return res.status(404).json({ error: "Not found" });
+    }
+    if (!file.encrypted || !file.data || !file.iv || !file.file_key_encrypted) {
+      return res.status(400).json({ error: "File is not encrypted or missing data" });
+    }
+
+    res.json({
+      data_base64: file.data,
+      iv_base64: file.iv,
+      file_key_encrypted_base64: file.file_key_encrypted,
+      mime: file.mime,
+      size: file.size,
+      name: file.name,
+    });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

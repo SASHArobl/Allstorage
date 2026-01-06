@@ -2,9 +2,11 @@
   "compilerOptions": {
     "baseUrl": "./",
     "paths": {
-      "*": ["node_modules/*", "../../packages/*/src"]
+      "*": ["node_modules/*", "../../packages/*/src"],
+      "pkg-crypto": ["../../packages/crypto/src/index.ts"],
+      "pkg-crypto/*": ["../../packages/crypto/src/*"]
     },
-    "rootDir": "src",
+    "rootDir": "../..",
     "outDir": "dist",
     "module": "commonjs",
     "target": "ES2020",
