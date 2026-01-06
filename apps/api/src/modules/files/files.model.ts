@@ -10,15 +10,12 @@ export interface IFile {
   name: string;
   type: FileType;
 
-  parent_id?: Types.ObjectId | null;
+  parent_id: Types.ObjectId | null;
   path: string;
 
   telegram_file_id?: string;
   size?: number;
   mime?: string;
-
-  encrypted: boolean;
-  file_key_encrypted?: string;
 
   created_at: Date;
   updated_at: Date;
@@ -61,22 +58,8 @@ const FileSchema = new Schema<IFile>(
       type: String,
     },
 
-    size: {
-      type: Number,
-    },
-
-    mime: {
-      type: String,
-    },
-
-    encrypted: {
-      type: Boolean,
-      default: false,
-    },
-
-    file_key_encrypted: {
-      type: String,
-    },
+    size: Number,
+    mime: String,
   },
   {
     timestamps: {
