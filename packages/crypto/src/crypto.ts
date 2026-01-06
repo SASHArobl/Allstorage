@@ -12,15 +12,26 @@ export const generateRSAKeys = () => {
 };
 
 // RSA шифрование (AES ключ)
-export const encryptRSA = (publicKeyPem: string, data: string) => {
+export const encryptRSA = (publicKeyPem: string, data: Buffer | string) => {
   const publicKey = forge.pki.publicKeyFromPem(publicKeyPem);
-  return publicKey.encrypt(data, "RSA-OAEP");
+  const raw =
+    Buffer.isBuffer(data) ? data.toString("binary") : Buffer.from(data, "utf8").toString("binary");
+  const encrypted = publicKey.encrypt(raw, "RSA-OAEP", {
+    md: forge.md.sha256.create(),
+    mgf1: forge.mgf.mgf1.create(forge.md.sha256.create()),
+  });
+  return Buffer.from(encrypted, "binary").toString("base64");
 };
 
 // RSA расшифровка
-export const decryptRSA = (privateKeyPem: string, encrypted: string) => {
+export const decryptRSA = (privateKeyPem: string, encryptedBase64: string) => {
   const privateKey = forge.pki.privateKeyFromPem(privateKeyPem);
-  return privateKey.decrypt(encrypted, "RSA-OAEP");
+  const encrypted = Buffer.from(encryptedBase64, "base64").toString("binary");
+  const decrypted = privateKey.decrypt(encrypted, "RSA-OAEP", {
+    md: forge.md.sha256.create(),
+    mgf1: forge.mgf.mgf1.create(forge.md.sha256.create()),
+  });
+  return Buffer.from(decrypted, "binary");
 };
 
 // ===== AES =====
@@ -35,21 +46,32 @@ export const encryptAES = (plaintext: Buffer | string) => {
 
   // Конвертируем Node.js Buffer в forge строку
   const plaintextBytes =
-    Buffer.isBuffer(plaintext) ? forge.util.createBuffer(plaintext.toString("binary")) : forge.util.createBuffer(plaintext);
+    Buffer.isBuffer(plaintext)
+      ? forge.util.createBuffer(plaintext.toString("binary"))
+      : forge.util.createBuffer(Buffer.from(plaintext, "utf8").toString("binary"));
 
   cipher.update(plaintextBytes);
   cipher.finish();
 
   const encrypted = cipher.output.getBytes();
-  return { encrypted, key, iv };
+  return {
+    encrypted: Buffer.from(encrypted, "binary").toString("base64"),
+    key: Buffer.from(key, "binary").toString("base64"),
+    iv: Buffer.from(iv, "binary").toString("base64"),
+  };
 };
 
 // AES расшифровка
-export const decryptAES = (encrypted: string, key: string, iv: string) => {
+export const decryptAES = (encryptedBase64: string, keyBase64: string, ivBase64: string) => {
+  const key = Buffer.from(keyBase64, "base64").toString("binary");
+  const iv = Buffer.from(ivBase64, "base64").toString("binary");
+  const encrypted = Buffer.from(encryptedBase64, "base64").toString("binary");
+
   const decipher = forge.cipher.createDecipher("AES-CBC", key);
   decipher.start({ iv });
   decipher.update(forge.util.createBuffer(encrypted));
   const success = decipher.finish();
   if (!success) throw new Error("AES decryption failed");
-  return decipher.output.getBytes();
+  const out = decipher.output.getBytes();
+  return Buffer.from(out, "binary");
 };
